@@ -1,3 +1,4 @@
+import configparser
 import ctypes
 import os
 import winreg
@@ -7,7 +8,6 @@ from PyQt6.QtCore import QTimer, QObject, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from winotify import Notification
-import configparser
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -62,7 +62,6 @@ class ThemeWatcher(QObject):
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, config['Settings']['WINDOWS_THEME_PATH']) as key:
             value = winreg.QueryValueEx(key, "AppsUseLightTheme")[0]
             return value == 1
-
 
     def check_theme(self) -> None:
         current_theme = self.get_current_theme()
@@ -125,6 +124,7 @@ class BinTrayIcon(QSystemTrayIcon):
         double_click_action.setChecked(config.getboolean('Settings', 'EMPTYDOUBLECLICK'))
         double_click_action.triggered.connect(self._toggle_double_click)
 
+
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self._exit_app)
 
@@ -137,12 +137,13 @@ class BinTrayIcon(QSystemTrayIcon):
     @staticmethod
     def _toggle_double_click(checked: bool) -> None:
         config.set('Settings', 'EMPTYDOUBLECLICK', str(checked))
-        with open('config.ini', 'w') as configfile: # type: ignore
+        with open('config.ini', 'w') as configfile:  # type: ignore
             config.write(configfile)
 
     @staticmethod
     def _exit_app() -> None:
         QApplication.quit()
+
 
 
 class TrayApplication:
