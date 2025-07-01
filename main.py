@@ -1,9 +1,13 @@
 import configparser
 import ctypes
 import os
+import sys
 import winreg
 from typing import Optional
 
+import win32api
+import win32event
+import winerror
 from PyQt6.QtCore import QTimer, QObject, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
@@ -131,7 +135,6 @@ class BinTrayIcon(QSystemTrayIcon):
         double_click_action.setChecked(config.getboolean('Settings', 'EMPTYDOUBLECLICK'))
         double_click_action.triggered.connect(self._toggle_double_click)
 
-
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self._exit_app)
 
@@ -152,19 +155,26 @@ class BinTrayIcon(QSystemTrayIcon):
         QApplication.quit()
 
 
-
 class TrayApplication:
     """Main application"""
 
     def __init__(self):
         self.app = QApplication([])
         self.app.setQuitOnLastWindowClosed(False)
+        self.mutex = None
 
     def run(self) -> None:
-        tray_icon = BinTrayIcon()
-        tray_icon.activated.connect(tray_icon.handle_click)
-        tray_icon.show()
-        self.app.exec()
+        mutex_name = 'QuickBinMutex'
+        mutex = win32event.CreateMutex(None, False, mutex_name)
+        error = win32api.GetLastError()
+
+        if error == winerror.ERROR_ALREADY_EXISTS:
+            sys.exit(0)
+        else:
+            tray_icon = BinTrayIcon()
+            tray_icon.activated.connect(tray_icon.handle_click)
+            tray_icon.show()
+            self.app.exec()
 
 
 if __name__ == "__main__":
