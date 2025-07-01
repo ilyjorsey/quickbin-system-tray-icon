@@ -13,8 +13,11 @@ from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QMenu
 from winotify import Notification
 
+from utils import resource_path
+
 config = configparser.ConfigParser()
-config.read('config.ini')
+config_path = resource_path('config.ini')
+config.read(config_path)
 
 
 class RecycleBinManager:
@@ -119,13 +122,30 @@ class BinTrayIcon(QSystemTrayIcon):
 
     def _update_icon(self, is_light_theme: bool) -> None:
         theme_folder = "icons/light_theme" if is_light_theme else "icons/dark_theme"
-        icon_path = os.path.join(theme_folder, "empty.png")
+        icon_path = resource_path(os.path.join(theme_folder, "empty.png"))
         self.setIcon(QIcon(icon_path))
 
     def _set_loading_icon(self, is_light_theme: bool) -> None:
         theme_folder = "icons/light_theme" if is_light_theme else "icons/dark_theme"
-        icon_path = os.path.join(theme_folder, "loading.png")
+        icon_path = resource_path(os.path.join(theme_folder, "loading.png"))
         self.setIcon(QIcon(icon_path))
+
+    def _set_start_at_boot(self) -> None:
+        run_path = config.get('Settings', 'START_AT_BOOT_PATH')
+        app_name = config.get('Settings', 'APP_NAME')
+        exe_path = os.path.abspath(sys.argv[0])
+
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, run_path, 0, winreg.KEY_WRITE) as key:
+                if config.getboolean('Settings', 'IS_START_AT_BOOT'):
+                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, f'"{exe_path}"')
+                else:
+                    try:
+                        winreg.DeleteValue(key, app_name)
+                    except FileNotFoundError:
+                        pass
+        except PermissionError:
+            pass
 
     def _create_tray_menu(self) -> None:
         menu = QMenu()
@@ -135,20 +155,31 @@ class BinTrayIcon(QSystemTrayIcon):
         double_click_action.setChecked(config.getboolean('Settings', 'EMPTYDOUBLECLICK'))
         double_click_action.triggered.connect(self._toggle_double_click)
 
+        start_at_boot = QAction("Start at boot", self)
+        start_at_boot.setCheckable(True)
+        start_at_boot.setChecked(config.getboolean('Settings', 'IS_START_AT_BOOT'))
+        start_at_boot.triggered.connect(self._toggle_start_at_boot)
+
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(self._exit_app)
 
+        menu.addAction(start_at_boot)
         menu.addAction(double_click_action)
         menu.addSeparator()
         menu.addAction(exit_action)
 
         self.setContextMenu(menu)
 
-    @staticmethod
-    def _toggle_double_click(checked: bool) -> None:
+    def _toggle_double_click(self, checked: bool) -> None:
         config.set('Settings', 'EMPTYDOUBLECLICK', str(checked))
-        with open('config.ini', 'w') as configfile:  # type: ignore
+        with open(config_path, 'w') as configfile:
             config.write(configfile)
+
+    def _toggle_start_at_boot(self, checked: bool) -> None:
+        config.set('Settings', 'IS_START_AT_BOOT', str(checked))
+        with open(config_path, 'w') as configfile:
+            config.write(configfile)
+        self._set_start_at_boot()
 
     @staticmethod
     def _exit_app() -> None:
@@ -165,7 +196,7 @@ class TrayApplication:
 
     def run(self) -> None:
         mutex_name = 'QuickBinMutex'
-        mutex = win32event.CreateMutex(None, False, mutex_name)
+        _mutex = win32event.CreateMutex(None, False, mutex_name)  # Mutex for prevented double app launch
         error = win32api.GetLastError()
 
         if error == winerror.ERROR_ALREADY_EXISTS:
