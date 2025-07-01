@@ -105,7 +105,9 @@ class BinTrayIcon(QSystemTrayIcon):
         if config.getboolean('Settings', 'EMPTYDOUBLECLICK'):
             self.double_click_detected = True
             self.single_click_timer.stop()
+            self._set_loading_icon(self.theme_watcher.get_current_theme())
             self.bin_manager.clear_bin()
+            self._update_icon(self.theme_watcher.get_current_theme())
 
     def _handle_single_click(self) -> None:
         if not self.double_click_detected:
@@ -114,6 +116,11 @@ class BinTrayIcon(QSystemTrayIcon):
     def _update_icon(self, is_light_theme: bool) -> None:
         theme_folder = "icons/light_theme" if is_light_theme else "icons/dark_theme"
         icon_path = os.path.join(theme_folder, "empty.png")
+        self.setIcon(QIcon(icon_path))
+
+    def _set_loading_icon(self, is_light_theme: bool) -> None:
+        theme_folder = "icons/light_theme" if is_light_theme else "icons/dark_theme"
+        icon_path = os.path.join(theme_folder, "loading.png")
         self.setIcon(QIcon(icon_path))
 
     def _create_tray_menu(self) -> None:
